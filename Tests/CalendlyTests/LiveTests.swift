@@ -93,3 +93,68 @@ final class LiveTests: XCTestCase {
         } catch { XCTFail("unexpected \(error)") }
     }
 }
+
+// MARK: - Extended surface
+
+extension LiveTests {
+
+    /// Reads only — nothing here changes anything on the account.
+    func testTheExtendedReadsAgainstARealAccount() async throws {
+        try XCTSkipUnless(token != nil, "set CALENDLY_TOKEN to run")
+        let calendly = Calendly(token: token!)
+
+        // Busy times: the closest Calendly gets to reading a calendar.
+        let busy = try await calendly.busyTimes()
+        for block in busy {
+            XCTAssertNotNil(block.startTime)
+            XCTAssertNotNil(block.endTime)
+            if let start = block.startTime, let end = block.endTime {
+                XCTAssertGreaterThan(end, start, "a busy block must end after it starts")
+            }
+        }
+
+        // Team. A solo account is still a one-member organisation.
+        let members = try await calendly.members()
+        XCTAssertFalse(members.isEmpty, "you are a member of your own organisation")
+        XCTAssertNotNil(members.first?.role)
+
+        // Invitees, where there is anything booked to have them.
+        let events = try await calendly.scheduledEvents(limit: 1)
+        if let first = events.first {
+            let invitees = try await calendly.invitees(of: first.uri)
+            for invitee in invitees {
+                XCTAssertNotNil(invitee.rescheduleURL,
+                                "rescheduling is the invitee's action, via their link")
+            }
+        }
+    }
+
+    /// Calendly caps this window at a week, so the library refuses a wider one
+    /// rather than letting the API reject it.
+    func testABusyWindowWiderThanAWeekIsRefusedLocally() async throws {
+        try XCTSkipUnless(token != nil, "set CALENDLY_TOKEN to run")
+        do {
+            _ = try await Calendly(token: token!)
+                .busyTimes(from: Date(), to: Date().addingTimeInterval(14 * 86_400))
+            XCTFail("a fortnight is wider than Calendly allows")
+        } catch let error as CalendlyError {
+            guard case .invalidParameters = error else { return XCTFail("got \(error)") }
+        }
+    }
+
+    /// The one write worth testing: it creates a LINK, not a booking, and
+    /// touches no calendar. Guarded separately so a read-only run never fires
+    /// it — set CALENDLY_WRITE=1 as well.
+    func testASingleUseLinkCanBeCreated() async throws {
+        try XCTSkipUnless(token != nil, "set CALENDLY_TOKEN to run")
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["CALENDLY_WRITE"] == "1",
+                          "set CALENDLY_WRITE=1 to exercise the one safe write")
+        let calendly = Calendly(token: token!)
+        let types = try await calendly.eventTypes()
+        let first = try XCTUnwrap(types.first)
+
+        let link = try await calendly.singleUseLink(for: first.uri)
+        XCTAssertTrue(link.url.contains("calendly.com"), link.url)
+        XCTAssertEqual(link.ownerType, "EventType")
+    }
+}

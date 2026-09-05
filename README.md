@@ -39,6 +39,28 @@ So `/users/me` is a *mandatory first call* before almost anything else. This
 client fetches it once and remembers it, rather than making every caller thread
 it through — pass `user:` explicitly to skip even that.
 
+## What it can and cannot do
+
+**Calendly is a booking layer, not a calendar.** The thing that surprises
+people: there is **no create-booking endpoint**, and **no reschedule
+endpoint**. Only a person clicking a link can book, and moving a booking is
+*their* action — you hand them `invitee.rescheduleURL`.
+
+```swift
+try await calendly.invitees(of: event)      // who booked, and their answers
+try await calendly.busyTimes()              // what is ACTUALLY taken
+try await calendly.members()                // the organisation
+try await calendly.singleUseLink(for: type) // a link that works once
+try await calendly.cancel(event, reason: …) // call one off
+```
+
+`busyTimes()` is the interesting one: it includes events from **connected
+Google and Outlook calendars**, so it answers "am I actually free" where
+`availabilitySchedules()` only answers "would I in principle be working".
+Calendly caps that window at one week, and this refuses a wider one locally.
+
+To put something *in* a calendar, you want EventKit, not Calendly.
+
 ## Three things measured, not assumed
 
 **A past start time is rejected outright.** Calendly answers with a bare
@@ -64,7 +86,7 @@ the flat shape, not Calendly's.
 
 ## Tested
 
-16 tests. Fourteen offline on recorded bodies — both response envelopes, the
+19 tests. Fourteen offline on recorded bodies — both response envelopes, the
 URI-addressing, the identity being fetched once, the day-off rule, each HTTP
 status. Two run against a real account, skipped unless you ask:
 
@@ -72,8 +94,14 @@ status. Two run against a real account, skipped unless you ask:
 $ CALENDLY_TOKEN=… swift test --filter LiveTests
 ```
 
-Those passed 2026-09-05 and are **read-only** — nothing in this library's test
-suite creates, cancels or modifies anything.
+Those passed 2026-09-05. All but one are **read-only**; the exception creates
+a single-use link — which touches no calendar — and is behind a second flag:
+
+```console
+$ CALENDLY_TOKEN=… CALENDLY_WRITE=1 swift test --filter LiveTests
+```
+
+`cancel` is deliberately not exercised by any test: it emails a real person.
 
 ## Requirements
 

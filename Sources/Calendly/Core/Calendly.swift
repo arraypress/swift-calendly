@@ -153,6 +153,116 @@ public actor Calendly {
         return try decodeCollection(AvailabilitySchedule.self, from: data)
     }
 
+    // MARK: - Who booked
+
+    /// The people on a booking, with their answers to its questions.
+    ///
+    /// Also where the reschedule and cancel links live — RESCHEDULING IS THE
+    /// INVITEE'S ACTION. There is no move-a-booking endpoint; you hand them
+    /// ``Invitee/rescheduleURL`` and they choose.
+    public func invitees(of event: String, limit: Int = 25) async throws -> [Invitee] {
+        let uuid = try Calendly.uuid(of: event)
+        let data = try await get("/scheduled_events/\(uuid)/invitees", query: [
+            "count": String(min(max(limit, 1), Calendly.maximumCount)),
+        ])
+        return try decodeCollection(Invitee.self, from: data)
+    }
+
+    // MARK: - Actually busy
+
+    /// Blocks of time already taken, CONNECTED CALENDARS INCLUDED.
+    ///
+    /// The closest Calendly comes to reading a calendar: an `external` entry
+    /// is an event from a linked Google or Outlook account. So this answers
+    /// "am I actually free" where ``availabilitySchedules()`` only answers
+    /// "would I in principle be working".
+    ///
+    /// - Note: Calendly caps this window at **one week**.
+    public func busyTimes(user: String? = nil, from: Date = Date(),
+                          to: Date? = nil) async throws -> [BusyTime] {
+        let uri: String
+        if let user { uri = user } else { uri = try await me().uri }
+        let end = to ?? from.addingTimeInterval(7 * 24 * 3_600)
+        guard end > from else {
+            throw CalendlyError.invalidParameters("the window ends before it starts")
+        }
+        guard end.timeIntervalSince(from) <= 7 * 24 * 3_600 + 60 else {
+            throw CalendlyError.invalidParameters("busy times cover at most one week")
+        }
+        let data = try await get("/user_busy_times", query: [
+            "user": uri,
+            "start_time": Timestamps.format(from),
+            "end_time": Timestamps.format(end),
+        ])
+        return try decodeCollection(BusyTime.self, from: data)
+    }
+
+    // MARK: - Team
+
+    /// Everyone in the organisation.
+    public func members(organization: String? = nil, limit: Int = 25) async throws -> [Member] {
+        let org: String
+        if let organization { org = organization } else {
+            guard let mine = try await me().organization else {
+                throw CalendlyError.notFound("an organisation on this account")
+            }
+            org = mine
+        }
+        let data = try await get("/organization_memberships", query: [
+            "organization": org,
+            "count": String(min(max(limit, 1), Calendly.maximumCount)),
+        ])
+        return try decodeCollection(Member.self, from: data)
+    }
+
+    // MARK: - Writing
+
+    /// A booking link that expires after a set number of uses.
+    ///
+    /// The one write worth having for an agent: hand someone a link that can
+    /// be used once and then stops working, rather than your permanent page.
+    ///
+    /// - Parameters:
+    ///   - eventType: The type's URI.
+    ///   - maxEvents: How many bookings it allows. Calendly's own limit is 1.
+    public func singleUseLink(for eventType: String, maxEvents: Int = 1) async throws -> SchedulingLink {
+        let data = try await post("/scheduling_links", body: [
+            "max_event_count": .number(Double(max(1, maxEvents))),
+            "owner": .string(eventType),
+            "owner_type": .string("EventType"),
+        ])
+        return try decodeResource(SchedulingLink.self, from: data)
+    }
+
+    /// Calls a booking off.
+    ///
+    /// - Note: This CANCELS. There is no reschedule endpoint — moving a
+    ///   booking is the invitee's action, through
+    ///   ``Invitee/rescheduleURL``.
+    @discardableResult
+    public func cancel(_ event: String, reason: String? = nil) async throws -> Cancellation {
+        let uuid = try Calendly.uuid(of: event)
+        var body: [String: JSONValue] = [:]
+        if let reason, !reason.isEmpty { body["reason"] = .string(reason) }
+        let data = try await post("/scheduled_events/\(uuid)/cancellation", body: body)
+        return try decodeResource(Cancellation.self, from: data)
+    }
+
+    // MARK: - Identifiers
+
+    /// The UUID at the end of a Calendly URI.
+    ///
+    /// Some endpoints are addressed by URI in a query parameter and others by
+    /// the bare UUID in the path, so both forms have to be accepted.
+    public static func uuid(of uri: String) throws -> String {
+        let tail = uri.split(separator: "/").last.map(String.init) ?? uri
+        let stripped = tail.replacingOccurrences(of: "-", with: "")
+        guard stripped.count == 32, stripped.allSatisfy(\.isHexDigit) else {
+            throw CalendlyError.invalidParameters("'\(uri)' is not a Calendly URI or UUID")
+        }
+        return tail
+    }
+
     // MARK: - Booking links
 
     /// The public page where anything of yours can be booked.
@@ -200,6 +310,35 @@ public actor Calendly {
     }
 
     /// Calendly's own message, which is the only useful part of a 4xx body.
+    private func post(_ path: String, body: [String: JSONValue]) async throws -> Data {
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = host
+        components.path = path
+        guard let url = components.url else {
+            throw CalendlyError.malformed("could not build a URL for \(path)")
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.httpBody = try? JSONEncoder().encode(JSONValue.object(body))
+
+        let (data, response) = try await transport(request)
+        switch response.statusCode {
+        case 200...299: return data
+        case 401: throw CalendlyError.unauthorized(Calendly.message(in: data) ?? "rejected the token")
+        case 403: throw CalendlyError.forbidden(Calendly.message(in: data) ?? "forbidden")
+        case 404: throw CalendlyError.notFound(path)
+        case 429:
+            let after = response.value(forHTTPHeaderField: "Retry-After").flatMap { Int(Double($0) ?? 0) }
+            throw CalendlyError.rateLimited(retryAfter: after)
+        default:
+            throw CalendlyError.invalidParameters(Calendly.message(in: data) ?? "HTTP \(response.statusCode)")
+        }
+    }
+
     private static func message(in data: Data) -> String? {
         guard let value = try? JSONDecoder().decode(JSONValue.self, from: data) else { return nil }
         return value["message"]?.string ?? value["title"]?.string

@@ -117,3 +117,81 @@ extension AvailabilitySchedule {
         try container.encode(rules, forKey: .rules)
     }
 }
+
+// MARK: - Extended
+
+extension Invitee.Answer {
+    private enum OutputKeys: String, CodingKey { case question, answer }
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: OutputKeys.self)
+        try container.encode(question, forKey: .question)
+        try container.encode(answer, forKey: .answer)
+    }
+}
+
+extension Invitee {
+    private enum OutputKeys: String, CodingKey {
+        case uri, name, email, status, timezone, answers
+        case rescheduleURL, cancelURL, createdAt
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: OutputKeys.self)
+        try container.encode(uri, forKey: .uri)
+        try container.encodeIfPresent(name, forKey: .name)
+        try container.encodeIfPresent(email, forKey: .email)
+        try container.encodeIfPresent(status, forKey: .status)
+        try container.encodeIfPresent(timezone, forKey: .timezone)
+        if !answers.isEmpty { try container.encode(answers, forKey: .answers) }
+        try container.encodeIfPresent(rescheduleURL, forKey: .rescheduleURL)
+        try container.encodeIfPresent(cancelURL, forKey: .cancelURL)
+        try container.encodeIfPresent(createdAt, forKey: .createdAt)
+    }
+}
+
+extension BusyTime {
+    private enum OutputKeys: String, CodingKey { case type, startTime, endTime, event, isExternal }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: OutputKeys.self)
+        try container.encodeIfPresent(type, forKey: .type)
+        try container.encodeIfPresent(startTime, forKey: .startTime)
+        try container.encodeIfPresent(endTime, forKey: .endTime)
+        try container.encodeIfPresent(event, forKey: .event)
+        try container.encode(isExternal, forKey: .isExternal)
+    }
+}
+
+extension Member {
+    private enum OutputKeys: String, CodingKey { case uri, role, user, organization }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: OutputKeys.self)
+        try container.encode(uri, forKey: .uri)
+        try container.encodeIfPresent(role, forKey: .role)
+        try container.encodeIfPresent(user, forKey: .user)
+        try container.encodeIfPresent(organization, forKey: .organization)
+    }
+}
+
+extension SchedulingLink {
+    private enum OutputKeys: String, CodingKey { case url, owner, ownerType }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: OutputKeys.self)
+        try container.encode(url, forKey: .url)
+        try container.encodeIfPresent(owner, forKey: .owner)
+        try container.encodeIfPresent(ownerType, forKey: .ownerType)
+    }
+}
+
+extension Cancellation {
+    private enum OutputKeys: String, CodingKey { case reason, cancelledBy, cancelledAt }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: OutputKeys.self)
+        try container.encodeIfPresent(reason, forKey: .reason)
+        try container.encodeIfPresent(cancelledBy, forKey: .cancelledBy)
+        try container.encodeIfPresent(cancelledAt, forKey: .cancelledAt)
+    }
+}
