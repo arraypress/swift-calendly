@@ -16,6 +16,7 @@ extension User {
         case uri, name, slug, email, schedulingURL, timezone, organization, avatarURL, createdAt
     }
 
+    /// Writes the flattened shape, not the one Calendly sends.
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: OutputKeys.self)
         try container.encode(uri, forKey: .uri)
@@ -36,6 +37,7 @@ extension EventType {
         case description, color, secret, locations
     }
 
+    /// Writes the flattened shape, not the one Calendly sends.
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: OutputKeys.self)
         try container.encode(uri, forKey: .uri)
@@ -58,6 +60,7 @@ extension ScheduledEvent {
         case inviteesActive, inviteesLimit, cancelReason, isActive
     }
 
+    /// Writes the flattened shape, not the one Calendly sends.
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: OutputKeys.self)
         try container.encode(uri, forKey: .uri)
@@ -79,6 +82,7 @@ extension Slot {
         case startTime, status, schedulingURL, inviteesRemaining
     }
 
+    /// Writes the flattened shape, not the one Calendly sends.
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: OutputKeys.self)
         try container.encode(startTime, forKey: .startTime)
@@ -93,6 +97,7 @@ extension AvailabilitySchedule.Rule {
         case type, weekday, date, intervals, isAvailable
     }
 
+    /// Writes the flattened shape, not the one Calendly sends.
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: OutputKeys.self)
         try container.encodeIfPresent(type, forKey: .type)
@@ -108,6 +113,7 @@ extension AvailabilitySchedule.Rule {
 extension AvailabilitySchedule {
     private enum OutputKeys: String, CodingKey { case uri, name, timezone, isDefault, rules }
 
+    /// Writes the flattened shape, not the one Calendly sends.
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: OutputKeys.self)
         try container.encode(uri, forKey: .uri)
@@ -122,6 +128,7 @@ extension AvailabilitySchedule {
 
 extension Invitee.Answer {
     private enum OutputKeys: String, CodingKey { case question, answer }
+    /// Writes the flattened shape, not the one Calendly sends.
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: OutputKeys.self)
         try container.encode(question, forKey: .question)
@@ -135,6 +142,7 @@ extension Invitee {
         case rescheduleURL, cancelURL, createdAt
     }
 
+    /// Writes the flattened shape, not the one Calendly sends.
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: OutputKeys.self)
         try container.encode(uri, forKey: .uri)
@@ -152,6 +160,7 @@ extension Invitee {
 extension BusyTime {
     private enum OutputKeys: String, CodingKey { case type, startTime, endTime, event, isExternal }
 
+    /// Writes the flattened shape, not the one Calendly sends.
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: OutputKeys.self)
         try container.encodeIfPresent(type, forKey: .type)
@@ -165,6 +174,7 @@ extension BusyTime {
 extension Member {
     private enum OutputKeys: String, CodingKey { case uri, role, user, organization }
 
+    /// Writes the flattened shape, not the one Calendly sends.
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: OutputKeys.self)
         try container.encode(uri, forKey: .uri)
@@ -177,6 +187,7 @@ extension Member {
 extension SchedulingLink {
     private enum OutputKeys: String, CodingKey { case url, owner, ownerType }
 
+    /// Writes the flattened shape, not the one Calendly sends.
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: OutputKeys.self)
         try container.encode(url, forKey: .url)
@@ -188,6 +199,7 @@ extension SchedulingLink {
 extension Cancellation {
     private enum OutputKeys: String, CodingKey { case reason, cancelledBy, cancelledAt }
 
+    /// Writes the flattened shape, not the one Calendly sends.
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: OutputKeys.self)
         try container.encodeIfPresent(reason, forKey: .reason)

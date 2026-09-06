@@ -23,6 +23,7 @@ public enum CalendlyError: Error, LocalizedError, Sendable, Equatable {
     /// A window whose start is in the past, which Calendly always refuses.
     case startTimeInPast
 
+    /// A one-line reason, for a CLI or a log.
     public var errorDescription: String? {
         switch self {
         case .unauthorized(let detail): return detail

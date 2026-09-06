@@ -4,6 +4,12 @@
 //
 //  Created by David Sherlock on 2026.
 //
+//  Shapes verified against the live API on 2026-09-05.
+//
+//  The organising idea of this API is that EVERYTHING IS ADDRESSED BY URI —
+//  a full `https://api.calendly.com/...` URL, never a bare id. Listing your
+//  own event types means passing your own user URI as a query parameter, so
+//  `/users/me` is a mandatory first call before almost anything else.
 //  Calendly on a personal access token, not OAuth.
 //
 //  A PAT is scoped and made in the web UI in a minute, which is what lets a
@@ -20,6 +26,8 @@
 //  Verified against the live API on 2026-09-05.
 //
 
+//
+
 import Foundation
 
 /// A client for the Calendly API.
@@ -28,6 +36,7 @@ public actor Calendly {
     /// How requests are performed — injectable so tests run on recordings.
     public typealias Transport = @Sendable (URLRequest) async throws -> (Data, HTTPURLResponse)
 
+    /// The API host. Overridable so tests can point somewhere else.
     public static let defaultHost = "api.calendly.com"
     /// The most rows Calendly returns in one page.
     public static let maximumCount = 100
@@ -362,10 +371,3 @@ public actor Calendly {
         }
     }
 }
-
-// MARK: - Envelopes
-
-/// The two wrappers every Calendly response uses: one resource, or a
-/// collection with paging beside it.
-struct ResourceEnvelope<Item: Decodable>: Decodable { let resource: Item }
-struct CollectionEnvelope<Item: Decodable>: Decodable { let collection: [Item]? }
